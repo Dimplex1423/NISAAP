@@ -11,22 +11,63 @@ export async function GET(request: NextRequest) {
     if (!auth) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     if (!auth.isAdmin) return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 });
 
-    const users = await db.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        fullName: true,
-        role: true,
-        department: true,
-        isActive: true,
-        lastLogin: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') || '';
+    const role = searchParams.get('role') || '';
+    const status = searchParams.get('status') || '';
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10', 10)));
 
-    return NextResponse.json({ success: true, data: users });
+    // Build where clause
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search } },
+        { username: { contains: search } },
+        { email: { contains: search } },
+        { department: { contains: search } },
+      ];
+    }
+    if (role) {
+      where.role = role;
+    }
+    if (status === 'active') {
+      where.isActive = true;
+    } else if (status === 'inactive') {
+      where.isActive = false;
+    }
+
+    const [users, total] = await Promise.all([
+      db.user.findMany({
+        where,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          fullName: true,
+          role: true,
+          department: true,
+          isActive: true,
+          lastLogin: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.user.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error('Users list error:', error);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
@@ -66,7 +107,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await logAudit(auth.userId, 'CREATE_USER', 'Users', `Created user ${data.username}`);
+    await logAudit(auth.userId, 'CREATE_USER', 'Users', `Created user ${data.username} with role ${data.role}`);
 
     return NextResponse.json({
       success: true,
@@ -78,6 +119,8 @@ export async function POST(request: NextRequest) {
         role: user.role,
         department: user.department,
         isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
       },
     }, { status: 201 });
   } catch (error) {

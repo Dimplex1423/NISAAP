@@ -36,6 +36,7 @@ export function roleBadge(role: string) {
   const map: Record<string, string> = {
     admin: 'bg-nrz-navy text-white',
     analyst: 'bg-nrz-gold text-nrz-dark',
+    technician: 'bg-blue-500 text-white',
     viewer: 'bg-gray-400 text-white',
   };
   return <Badge className={`${map[role] || 'bg-gray-400 text-white'} capitalize`}>{role}</Badge>;

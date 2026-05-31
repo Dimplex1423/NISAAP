@@ -22,7 +22,7 @@ export const createUserSchema = z.object({
     .regex(passwordStrengthRegex, passwordStrengthMessage),
   email: z.string().email('Invalid email address'),
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
-  role: z.enum(['admin', 'analyst', 'viewer'], { message: 'Role must be admin, analyst, or viewer' }),
+  role: z.enum(['admin', 'analyst', 'viewer', 'technician'], { message: 'Role must be admin, analyst, technician, or viewer' }),
   department: z.string().optional(),
   isActive: z.boolean().optional(),
 });
@@ -35,7 +35,7 @@ export const updateUserSchema = z.object({
     .optional(),
   email: z.string().email('Invalid email address').optional(),
   fullName: z.string().min(2, 'Full name must be at least 2 characters').optional(),
-  role: z.enum(['admin', 'analyst', 'viewer'], { message: 'Role must be admin, analyst, or viewer' }).optional(),
+  role: z.enum(['admin', 'analyst', 'viewer', 'technician'], { message: 'Role must be admin, analyst, technician, or viewer' }).optional(),
   department: z.string().optional(),
   isActive: z.boolean().optional(),
 });
@@ -86,6 +86,12 @@ export const createAssessmentSchema = z.object({
 });
 
 // Helper to format Zod errors into a single string
+export const resetPasswordSchema = z.object({
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(passwordStrengthRegex, passwordStrengthMessage),
+});
+
 export function formatZodErrors(error: { issues: Array<{ message: string }> }): string {
   return error.issues.map(e => e.message).join(', ');
 }
