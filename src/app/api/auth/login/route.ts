@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error', debug: error?.message || String(error), env: { DB: process.env.DATABASE_URL?.substring(0, 20) || 'NOT SET', TOKEN: process.env.TURSO_AUTH_TOKEN ? 'SET' : 'NOT SET' } },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
