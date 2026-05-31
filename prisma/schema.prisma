@@ -1,0 +1,127 @@
+generator client {
+  provider        = "prisma-client-js"
+  driverAdapters  = "true"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  password     String
+  email        String   @unique
+  fullName     String
+  role         String   @default("analyst")
+  department   String   @default("IT Security")
+  isActive     Boolean  @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  assessments  Assessment[]
+  auditLogs    AuditLog[]
+}
+
+model IoTDevice {
+  id              String   @id @default(cuid())
+  deviceName      String
+  deviceType      String
+  ipAddress       String
+  macAddress      String?
+  location        String
+  station         String?
+  status          String   @default("active")
+  firmwareVersion String?
+  lastScanDate    DateTime?
+  riskLevel       String   @default("low")
+  networkSegment  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  vulnerabilities Vulnerability[]
+  assessments     Assessment[]
+
+  @@index([status])
+  @@index([riskLevel])
+  @@index([deviceType])
+  @@index([location])
+}
+
+model Vulnerability {
+  id              String   @id @default(cuid())
+  deviceId        String
+  title           String
+  description     String
+  severity        String
+  cvssScore       Float?
+  cveId           String?
+  status          String   @default("open")
+  discoveredDate  DateTime @default(now())
+  resolvedDate    DateTime?
+  remediation     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  device          IoTDevice  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  solutions       SecuritySolution[]
+
+  @@index([deviceId])
+  @@index([severity])
+  @@index([status])
+  @@index([discoveredDate])
+}
+
+model SecuritySolution {
+  id                  String   @id @default(cuid())
+  vulnerabilityId     String
+  title               String
+  description         String
+  implementationStatus String  @default("proposed")
+  priority            String   @default("medium")
+  assignedTo          String?
+  dueDate             DateTime?
+  completedDate       DateTime?
+  costEstimate        String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  vulnerability       Vulnerability @relation(fields: [vulnerabilityId], references: [id], onDelete: Cascade)
+
+  @@index([vulnerabilityId])
+  @@index([implementationStatus])
+  @@index([priority])
+}
+
+model Assessment {
+  id              String   @id @default(cuid())
+  deviceId        String
+  assessorId      String
+  findings        String
+  recommendations String
+  riskRating      String   @default("medium")
+  assessmentDate  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  device          IoTDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  assessor        User      @relation(fields: [assessorId], references: [id])
+
+  @@index([deviceId])
+  @@index([assessorId])
+  @@index([riskRating])
+  @@index([assessmentDate])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  module    String
+  details   String?
+  ipAddress String?
+  timestamp DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([module])
+  @@index([timestamp])
+}
