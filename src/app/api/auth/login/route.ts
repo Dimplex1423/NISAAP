@@ -121,10 +121,10 @@ export async function POST(request: NextRequest) {
 
     response.headers.set('Set-Cookie', cookie);
     return response;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: 'Internal server error', debug: error?.message || String(error), env: { DB: process.env.DATABASE_URL?.substring(0, 20) || 'NOT SET', TOKEN: process.env.TURSO_AUTH_TOKEN ? 'SET' : 'NOT SET' } },
       { status: 500 }
     );
   }
