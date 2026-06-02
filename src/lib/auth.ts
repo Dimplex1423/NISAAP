@@ -2,12 +2,15 @@ import { scryptSync, randomBytes, timingSafeEqual, createHmac } from 'crypto';
 
 const SESSION_COOKIE = 'nisaap-session';
 
-// SECURITY: Require SESSION_SECRET in production
+// SECURITY: Require SESSION_SECRET in production (checked at runtime, not module level, to avoid build failures)
 const _rawSecret = process.env.SESSION_SECRET;
-if (!_rawSecret && process.env.NODE_ENV === 'production') {
-  throw new Error('FATAL: SESSION_SECRET environment variable is required in production');
-}
 const SESSION_SECRET = _rawSecret || 'nisaap-dev-secret-change-in-production';
+
+function ensureSessionSecret(): void {
+  if (process.env.NODE_ENV === 'production' && !_rawSecret) {
+    throw new Error('FATAL: SESSION_SECRET environment variable is required in production');
+  }
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -44,14 +47,16 @@ function signSessionData(payload: string): string {
 }
 
 export function createSessionCookie(sessionData: SessionData): string {
+  ensureSessionSecret();
   const payload = Buffer.from(JSON.stringify(sessionData)).toString('base64');
   const signature = signSessionData(payload);
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  const sameSite = process.env.NODE_ENV === 'production' ? '; SameSite=Lax' : '; SameSite=Strict';
+  const sameSite = '; SameSite=Strict';
   return `${SESSION_COOKIE}=${payload}.${signature}; Path=/; HttpOnly${sameSite}; Max-Age=86400${secure}`;
 }
 
 export function getSessionFromCookie(cookieHeader: string | null): SessionData | null {
+  ensureSessionSecret();
   if (!cookieHeader) return null;
   const cookies = cookieHeader.split(';').map(c => c.trim());
   const sessionCookie = cookies.find(c => c.startsWith(`${SESSION_COOKIE}=`));
@@ -79,6 +84,6 @@ export function getSessionFromCookie(cookieHeader: string | null): SessionData |
 
 export function getDestroySessionCookie(): string {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  const sameSite = process.env.NODE_ENV === 'production' ? '; SameSite=Lax' : '; SameSite=Strict';
+  const sameSite = '; SameSite=Strict';
   return `${SESSION_COOKIE}=; Path=/; HttpOnly${sameSite}; Max-Age=0${secure}`;
 }

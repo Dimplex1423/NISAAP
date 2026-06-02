@@ -38,10 +38,29 @@ function createPrismaClient(): PrismaClient {
 
 // In production (Vercel serverless), always create a fresh client per cold start.
 // In development, reuse the client to avoid connection pool exhaustion.
-const db = globalForPrisma.prisma ?? createPrismaClient()
+// Lazy initialization to avoid build-time errors when env vars aren't available.
+let _db: PrismaClient | undefined = undefined;
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = db
+function getDb(): PrismaClient {
+  if (!_db) {
+    _db = createPrismaClient();
+    if (process.env.NODE_ENV !== 'production') {
+      globalForPrisma.prisma = _db;
+    }
+  }
+  return _db;
 }
+
+// Use a Proxy to lazily initialize the PrismaClient on first access
+const db = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const actualDb = getDb();
+    const value = Reflect.get(actualDb, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(actualDb);
+    }
+    return value;
+  },
+});
 
 export { db }

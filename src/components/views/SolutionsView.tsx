@@ -35,6 +35,7 @@ export function SolutionsView() {
     ]},
     { key: 'implementationStatus', label: 'Implementation Status', type: 'select', options: [
       { value: 'proposed', label: 'Proposed' },
+      { value: 'approved', label: 'Approved' },
       { value: 'in_progress', label: 'In Progress' },
       { value: 'implemented', label: 'Implemented' },
       { value: 'verified', label: 'Verified' },
