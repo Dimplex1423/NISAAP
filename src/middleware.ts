@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function proxy(request: NextRequest) {
+// Next.js middleware — this file MUST be named middleware.ts and
+// export a function named "middleware" for Next.js to recognize it.
+export function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
-  // Security headers — frame-ancestors allows all origins so preview iframes work
+  // Security headers
+  // Note: Basic headers are also set in vercel.json, but this middleware
+  // adds CSP and Permissions-Policy which vercel.json doesn't cover.
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-XSS-Protection', '1; mode=block');

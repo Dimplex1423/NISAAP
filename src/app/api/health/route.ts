@@ -23,10 +23,10 @@ export async function GET() {
     const client = createClient({ url: tursoUrl, authToken: tursoToken });
     const result = await client.execute("SELECT 1 as ok");
     health.database = result.rows[0]?.ok === 1 ? 'connected' : 'error';
-  } catch (error: any) {
+  } catch {
     health.database = 'disconnected';
-    health.dbError = error.message;
     health.status = 'degraded';
+    // Don't expose error details in production
   }
 
   const statusCode = health.status === 'ok' ? 200 : 503;

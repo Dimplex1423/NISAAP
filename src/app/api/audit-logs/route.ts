@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const moduleFilter = searchParams.get('module');
     const action = searchParams.get('action');
     const userId = searchParams.get('userId');
+    const page = safeParseInt(searchParams.get('page'), 1);
     const limit = safeParseInt(searchParams.get('limit'), 100, 1, 500);
 
     const where: Record<string, unknown> = {};
@@ -20,14 +21,22 @@ export async function GET(request: NextRequest) {
     if (action) where.action = action;
     if (userId) where.userId = userId;
 
-    const logs = await db.auditLog.findMany({
-      where,
-      include: { user: { select: { fullName: true, username: true } } },
-      orderBy: { timestamp: 'desc' },
-      take: limit,
-    });
+    const [logs, total] = await Promise.all([
+      db.auditLog.findMany({
+        where,
+        include: { user: { select: { fullName: true, username: true } } },
+        orderBy: { timestamp: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.auditLog.count({ where }),
+    ]);
 
-    return NextResponse.json({ success: true, data: logs });
+    return NextResponse.json({
+      success: true,
+      data: logs,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
   } catch (error) {
     console.error('Audit logs error:', error);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
