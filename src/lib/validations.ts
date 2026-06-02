@@ -92,6 +92,59 @@ export const resetPasswordSchema = z.object({
     .regex(passwordStrengthRegex, passwordStrengthMessage),
 });
 
+// Update schemas for PUT routes (all fields optional)
+export const updateDeviceSchema = z.object({
+  deviceName: z.string().min(2).optional(),
+  deviceType: z.enum(
+    ['scada', 'plc', 'rtu', 'sensor', 'camera', 'gateway', 'server', 'workstation', 'router', 'switch', 'firewall', 'controller', 'tracker', 'other'],
+    { message: 'Invalid device type' }
+  ).optional(),
+  ipAddress: z.string().regex(ipv4Regex, 'Invalid IPv4 address').optional(),
+  macAddress: z.string().regex(macAddressRegex, 'Invalid MAC address format').optional(),
+  location: z.string().min(2).optional(),
+  station: z.string().optional(),
+  networkSegment: z.string().optional(),
+  firmwareVersion: z.string().optional(),
+  riskLevel: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  status: z.enum(['active', 'inactive', 'maintenance', 'decommissioned']).optional(),
+});
+
+export const updateVulnerabilitySchema = z.object({
+  title: z.string().min(2).optional(),
+  description: z.string().min(10).optional(),
+  severity: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  cvssScore: z.number().min(0).max(10).optional(),
+  cveId: z.string().optional(),
+  status: z.enum(['open', 'in_progress', 'resolved', 'acknowledged', 'accepted_risk']).optional(),
+  remediation: z.string().optional(),
+  resolvedDate: z.string().optional(),
+});
+
+export const updateSolutionSchema = z.object({
+  title: z.string().min(2).optional(),
+  description: z.string().min(10).optional(),
+  priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  implementationStatus: z.enum(['proposed', 'approved', 'in_progress', 'implemented', 'verified']).optional(),
+  assignedTo: z.string().optional(),
+  dueDate: z.string().optional(),
+  completedDate: z.string().optional(),
+  costEstimate: z.string().optional(),
+});
+
+export const updateAssessmentSchema = z.object({
+  findings: z.string().min(10).optional(),
+  recommendations: z.string().min(10).optional(),
+  riskRating: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+});
+
 export function formatZodErrors(error: { issues: Array<{ message: string }> }): string {
   return error.issues.map(e => e.message).join(', ');
+}
+
+// Safe pagination helper — prevents NaN and enforces limits
+export function safeParseInt(value: string | null, defaultValue: number, min = 1, max = 500): number {
+  if (!value) return defaultValue;
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return defaultValue;
+  return Math.min(max, Math.max(min, parsed));
 }

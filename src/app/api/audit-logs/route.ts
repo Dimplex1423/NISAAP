@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
+import { safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     const moduleFilter = searchParams.get('module');
     const action = searchParams.get('action');
     const userId = searchParams.get('userId');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const limit = safeParseInt(searchParams.get('limit'), 100, 1, 500);
 
     const where: Record<string, unknown> = {};
     if (moduleFilter) where.module = moduleFilter;

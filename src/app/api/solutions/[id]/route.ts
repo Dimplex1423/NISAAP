@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
+import { updateSolutionSchema, formatZodErrors } from '@/lib/validations';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,24 +30,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!auth.canWrite) return NextResponse.json({ success: false, error: 'Write access required' }, { status: 403 });
 
     const { id } = await params;
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     const existing = await db.securitySolution.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ success: false, error: 'Solution not found' }, { status: 404 });
 
-    const updateData: Record<string, unknown> = {};
-    if (body.title) updateData.title = body.title;
-    if (body.description) updateData.description = body.description;
-    if (body.implementationStatus) {
-      updateData.implementationStatus = body.implementationStatus;
-      if (body.implementationStatus === 'implemented' || body.implementationStatus === 'verified') {
-        updateData.completedDate = new Date();
-      }
+    const parsed = updateSolutionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: formatZodErrors(parsed.error) },
+        { status: 400 }
+      );
     }
-    if (body.priority) updateData.priority = body.priority;
-    if (body.assignedTo !== undefined) updateData.assignedTo = body.assignedTo;
-    if (body.dueDate !== undefined) updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
-    if (body.costEstimate !== undefined) updateData.costEstimate = body.costEstimate;
+    const updateData: Record<string, unknown> = { ...parsed.data };
+    if (updateData.implementationStatus === 'implemented' || updateData.implementationStatus === 'verified') {
+      updateData.completedDate = new Date();
+    }
+    if (updateData.dueDate !== undefined) {
+      updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate as string) : null;
+    }
 
     const solution = await db.securitySolution.update({ where: { id }, data: updateData });
 

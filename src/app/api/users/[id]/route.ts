@@ -35,7 +35,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!auth.isAdmin) return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 });
 
     const { id } = await params;
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     // Check if this is a password reset request
     if (body._action === 'reset-password') {

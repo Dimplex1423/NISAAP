@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
+import { updateAssessmentSchema, formatZodErrors } from '@/lib/validations';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,15 +30,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!auth.canWrite) return NextResponse.json({ success: false, error: 'Write access required' }, { status: 403 });
 
     const { id } = await params;
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     const existing = await db.assessment.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ success: false, error: 'Assessment not found' }, { status: 404 });
 
-    const updateData: Record<string, unknown> = {};
-    if (body.findings) updateData.findings = body.findings;
-    if (body.recommendations) updateData.recommendations = body.recommendations;
-    if (body.riskRating) updateData.riskRating = body.riskRating;
+    const parsed = updateAssessmentSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: formatZodErrors(parsed.error) },
+        { status: 400 }
+      );
+    }
+    const updateData = parsed.data;
 
     const assessment = await db.assessment.update({ where: { id }, data: updateData });
 

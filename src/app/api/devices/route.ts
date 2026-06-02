@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
-import { createDeviceSchema, formatZodErrors } from '@/lib/validations';
+import { createDeviceSchema, formatZodErrors, safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
     const riskLevel = searchParams.get('riskLevel');
     const deviceType = searchParams.get('deviceType');
     const search = searchParams.get('search');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const page = safeParseInt(searchParams.get('page'), 1);
+    const limit = safeParseInt(searchParams.get('limit'), 50, 1, 100);
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
@@ -58,7 +58,12 @@ export async function POST(request: NextRequest) {
     if (!auth) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     if (!auth.canWrite) return NextResponse.json({ success: false, error: 'Write access required' }, { status: 403 });
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
     const parsed = createDeviceSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: formatZodErrors(parsed.error) }, { status: 400 });

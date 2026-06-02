@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
+import { updateDeviceSchema, formatZodErrors } from '@/lib/validations';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,24 +30,38 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!auth.canWrite) return NextResponse.json({ success: false, error: 'Write access required' }, { status: 403 });
 
     const { id } = await params;
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     const existing = await db.ioTDevice.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ success: false, error: 'Device not found' }, { status: 404 });
 
+    const parsed = updateDeviceSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: formatZodErrors(parsed.error) },
+        { status: 400 }
+      );
+    }
+    const updateData = parsed.data;
+
     const device = await db.ioTDevice.update({
       where: { id },
       data: {
-        ...(body.deviceName && { deviceName: body.deviceName }),
-        ...(body.deviceType && { deviceType: body.deviceType }),
-        ...(body.ipAddress && { ipAddress: body.ipAddress }),
-        ...(body.macAddress !== undefined && { macAddress: body.macAddress }),
-        ...(body.location && { location: body.location }),
-        ...(body.station !== undefined && { station: body.station }),
-        ...(body.status && { status: body.status }),
-        ...(body.firmwareVersion !== undefined && { firmwareVersion: body.firmwareVersion }),
-        ...(body.riskLevel && { riskLevel: body.riskLevel }),
-        ...(body.networkSegment !== undefined && { networkSegment: body.networkSegment }),
+        ...(updateData.deviceName && { deviceName: updateData.deviceName }),
+        ...(updateData.deviceType && { deviceType: updateData.deviceType }),
+        ...(updateData.ipAddress && { ipAddress: updateData.ipAddress }),
+        ...(updateData.macAddress !== undefined && { macAddress: updateData.macAddress }),
+        ...(updateData.location && { location: updateData.location }),
+        ...(updateData.station !== undefined && { station: updateData.station }),
+        ...(updateData.status && { status: updateData.status }),
+        ...(updateData.firmwareVersion !== undefined && { firmwareVersion: updateData.firmwareVersion }),
+        ...(updateData.riskLevel && { riskLevel: updateData.riskLevel }),
+        ...(updateData.networkSegment !== undefined && { networkSegment: updateData.networkSegment }),
         lastScanDate: new Date(),
       },
     });

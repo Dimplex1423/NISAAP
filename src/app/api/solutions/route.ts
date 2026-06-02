@@ -47,7 +47,12 @@ export async function POST(request: NextRequest) {
     if (!auth) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     if (!auth.canWrite) return NextResponse.json({ success: false, error: 'Write access required' }, { status: 403 });
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
     const parsed = createSolutionSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: formatZodErrors(parsed.error) }, { status: 400 });

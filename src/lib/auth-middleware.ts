@@ -19,7 +19,7 @@ export async function checkAuth(
   if (!session) return null;
   const isAdmin = session.role === 'admin';
   const canWrite = session.role === 'admin' || session.role === 'analyst';
-  if (requireAdmin && !isAdmin) return { userId: session.userId, role: session.role, isAdmin, canWrite };
-  if (requireWrite && !canWrite) return { userId: session.userId, role: session.role, isAdmin, canWrite };
+  if (requireAdmin && !isAdmin) return null;
+  if (requireWrite && !canWrite) return null;
   return { userId: session.userId, role: session.role, isAdmin, canWrite };
 }

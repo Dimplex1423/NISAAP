@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
+import { updateVulnerabilitySchema, formatZodErrors } from '@/lib/validations';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,22 +30,27 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!auth.canWrite) return NextResponse.json({ success: false, error: 'Write access required' }, { status: 403 });
 
     const { id } = await params;
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
 
     const existing = await db.vulnerability.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ success: false, error: 'Vulnerability not found' }, { status: 404 });
 
-    const updateData: Record<string, unknown> = {};
-    if (body.title) updateData.title = body.title;
-    if (body.description) updateData.description = body.description;
-    if (body.severity) updateData.severity = body.severity;
-    if (body.cvssScore !== undefined) updateData.cvssScore = body.cvssScore;
-    if (body.cveId !== undefined) updateData.cveId = body.cveId;
-    if (body.status) {
-      updateData.status = body.status;
-      if (body.status === 'resolved') updateData.resolvedDate = new Date();
+    const parsed = updateVulnerabilitySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: formatZodErrors(parsed.error) },
+        { status: 400 }
+      );
     }
-    if (body.remediation !== undefined) updateData.remediation = body.remediation;
+    const updateData: Record<string, unknown> = { ...parsed.data };
+    if (updateData.status === 'resolved') {
+      updateData.resolvedDate = new Date();
+    }
 
     const vulnerability = await db.vulnerability.update({ where: { id }, data: updateData });
 

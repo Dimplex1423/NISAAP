@@ -1,7 +1,13 @@
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from 'crypto';
 
 const SESSION_COOKIE = 'nisaap-session';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'nisaap-dev-secret-change-in-production';
+
+// SECURITY: Require SESSION_SECRET in production
+const _rawSecret = process.env.SESSION_SECRET;
+if (!_rawSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('FATAL: SESSION_SECRET environment variable is required in production');
+}
+const SESSION_SECRET = _rawSecret || 'nisaap-dev-secret-change-in-production';
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -10,10 +16,19 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, hash: string): boolean {
-  const [salt, key] = hash.split(':');
-  const keyBuffer = Buffer.from(key, 'hex');
-  const derivedBuffer = scryptSync(password, salt, 64);
-  return timingSafeEqual(keyBuffer, derivedBuffer);
+  // Guard against malformed or missing password hashes
+  if (!hash || !hash.includes(':')) return false;
+  const parts = hash.split(':');
+  if (parts.length !== 2) return false;
+  const [salt, key] = parts;
+  if (!salt || !key) return false;
+  try {
+    const keyBuffer = Buffer.from(key, 'hex');
+    const derivedBuffer = scryptSync(password, salt, 64);
+    return timingSafeEqual(keyBuffer, derivedBuffer);
+  } catch {
+    return false;
+  }
 }
 
 export interface SessionData {
@@ -50,7 +65,10 @@ export function getSessionFromCookie(cookieHeader: string | null): SessionData |
     const signature = value.substring(dotIndex + 1);
 
     const expectedSignature = signSessionData(payload);
-    if (signature !== expectedSignature) return null;
+    // Timing-safe comparison to prevent side-channel attacks
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSignature);
+    if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) return null;
 
     const decoded = Buffer.from(payload, 'base64').toString('utf-8');
     return JSON.parse(decoded) as SessionData;

@@ -14,7 +14,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Invalid JSON body' },
+        { status: 400 }
+      );
+    }
     const { currentPassword, newPassword } = body;
 
     if (!currentPassword || !newPassword) {

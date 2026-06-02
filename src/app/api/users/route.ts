@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
-import { createUserSchema, formatZodErrors } from '@/lib/validations';
+import { createUserSchema, formatZodErrors, safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const role = searchParams.get('role') || '';
     const status = searchParams.get('status') || '';
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '10', 10)));
+    const page = safeParseInt(searchParams.get('page'), 1);
+    const limit = safeParseInt(searchParams.get('limit'), 10, 1, 100);
 
     // Build where clause
     const where: any = {};
@@ -80,7 +80,12 @@ export async function POST(request: NextRequest) {
     if (!auth) return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });
     if (!auth.isAdmin) return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 });
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
     const parsed = createUserSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ success: false, error: formatZodErrors(parsed.error) }, { status: 400 });
