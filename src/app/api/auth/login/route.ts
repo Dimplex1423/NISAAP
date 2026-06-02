@@ -123,8 +123,15 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Login error:', error);
+    console.error('Login error details:', {
+      message: error?.message,
+      stack: error?.stack?.substring(0, 500),
+      tursoUrlSet: !!process.env.TURSO_DATABASE_URL,
+      tursoTokenSet: !!process.env.TURSO_AUTH_TOKEN,
+      databaseUrl: process.env.DATABASE_URL,
+    });
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: 'Internal server error', debug: error?.message },
       { status: 500 }
     );
   }

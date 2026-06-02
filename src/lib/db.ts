@@ -9,17 +9,30 @@ function createPrismaClient(): PrismaClient {
   // For Turso: use TURSO_DATABASE_URL for the actual connection
   // DATABASE_URL must be a valid SQLite URL (like file:./dev.db) for Prisma schema validation
   const tursoUrl = process.env.TURSO_DATABASE_URL || ''
-  const tursoToken = process.env.TURSO_AUTH_TOKEN
+  const tursoToken = process.env.TURSO_AUTH_TOKEN || ''
+
+  console.log('[DB] Environment check:', {
+    tursoUrlSet: tursoUrl.length > 0,
+    tursoUrlPrefix: tursoUrl.substring(0, 30),
+    tursoTokenSet: tursoToken.length > 0,
+    databaseUrl: process.env.DATABASE_URL || 'NOT SET',
+    nodeEnv: process.env.NODE_ENV,
+  })
 
   // If TURSO_DATABASE_URL is set with libsql://, use Turso driver adapter
-  if (tursoUrl.startsWith('libsql://') && tursoToken) {
+  if (tursoUrl.startsWith('libsql://') && tursoToken.length > 0) {
     console.log('[DB] Connecting to Turso cloud database:', tursoUrl.substring(0, 40) + '...')
-    // PrismaLibSQL is a FACTORY that takes a config object {url, authToken}, NOT a client instance
-    const adapter = new PrismaLibSQL({
-      url: tursoUrl,
-      authToken: tursoToken,
-    })
-    return new PrismaClient({ adapter } as any)
+    try {
+      // PrismaLibSQL is a FACTORY that takes a config object {url, authToken}, NOT a client instance
+      const adapter = new PrismaLibSQL({
+        url: tursoUrl,
+        authToken: tursoToken,
+      })
+      return new PrismaClient({ adapter } as any)
+    } catch (error: any) {
+      console.error('[DB] Failed to create Turso adapter:', error.message)
+      throw error
+    }
   }
 
   // Otherwise, use local SQLite (for development)
