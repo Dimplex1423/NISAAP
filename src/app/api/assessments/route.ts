@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
-import { createAssessmentSchema, formatZodErrors } from '@/lib/validations';
+import { createAssessmentSchema, formatZodErrors, safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
     const riskRating = searchParams.get('riskRating');
     const deviceId = searchParams.get('deviceId');
     const search = searchParams.get('search');
+    const page = safeParseInt(searchParams.get('page'), 1);
+    const limit = safeParseInt(searchParams.get('limit'), 50, 1, 100);
 
     const where: Record<string, unknown> = {};
     if (riskRating) where.riskRating = riskRating;
@@ -24,16 +26,25 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const assessments = await db.assessment.findMany({
-      where,
-      include: {
-        device: { select: { deviceName: true, ipAddress: true } },
-        assessor: { select: { fullName: true, username: true } },
-      },
-      orderBy: { assessmentDate: 'desc' },
-    });
+    const [assessments, total] = await Promise.all([
+      db.assessment.findMany({
+        where,
+        include: {
+          device: { select: { deviceName: true, ipAddress: true } },
+          assessor: { select: { fullName: true, username: true } },
+        },
+        orderBy: { assessmentDate: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.assessment.count({ where }),
+    ]);
 
-    return NextResponse.json({ success: true, data: assessments });
+    return NextResponse.json({
+      success: true,
+      data: assessments,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
   } catch (error) {
     console.error('Assessments list error:', error);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });

@@ -3,46 +3,18 @@ import { db } from '@/lib/db';
 import { hashPassword, verifyPassword, createSessionCookie } from '@/lib/auth';
 import { logAudit } from '@/lib/audit';
 import { loginSchema, formatZodErrors } from '@/lib/validations';
-
-// In-memory rate limiter: tracks failed attempts per IP
-const failedAttempts = new Map<string, { count: number; blockedUntil: number }>();
-const MAX_FAILED_ATTEMPTS = 5;
-const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+import { isIpBlocked, recordFailedAttempt, resetFailedAttempts, cleanupRateLimits } from '@/lib/rate-limiter';
 
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-function isIpBlocked(ip: string): boolean {
-  const entry = failedAttempts.get(ip);
-  if (!entry) return false;
-  if (entry.blockedUntil && Date.now() < entry.blockedUntil) return true;
-  if (entry.blockedUntil && Date.now() >= entry.blockedUntil) {
-    failedAttempts.delete(ip);
-    return false;
-  }
-  return false;
-}
-
-function recordFailedAttempt(ip: string): void {
-  const entry = failedAttempts.get(ip) || { count: 0, blockedUntil: 0 };
-  entry.count += 1;
-  if (entry.count >= MAX_FAILED_ATTEMPTS) {
-    entry.blockedUntil = Date.now() + BLOCK_DURATION_MS;
-  }
-  failedAttempts.set(ip, entry);
-}
-
-function resetFailedAttempts(ip: string): void {
-  failedAttempts.delete(ip);
 }
 
 export async function POST(request: NextRequest) {
   try {
     const ip = getClientIp(request);
 
-    // Check rate limit
-    if (isIpBlocked(ip)) {
+    // Check rate limit (database-backed, works on Vercel)
+    if (await isIpBlocked(ip)) {
       return NextResponse.json(
         { success: false, error: 'Too many failed login attempts. Please try again later.' },
         { status: 429 }
@@ -72,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     const user = await db.user.findUnique({ where: { username } });
     if (!user) {
-      recordFailedAttempt(ip);
+      await recordFailedAttempt(ip);
       return NextResponse.json(
         { success: false, error: 'Invalid credentials' },
         { status: 401 }
@@ -88,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     const isValid = verifyPassword(password, user.password);
     if (!isValid) {
-      recordFailedAttempt(ip);
+      await recordFailedAttempt(ip);
       await logAudit(user.id, 'LOGIN_FAILED', 'Authentication', `Failed login attempt for ${username}`);
       return NextResponse.json(
         { success: false, error: 'Invalid credentials' },
@@ -97,7 +69,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Reset failed attempts on successful login
-    resetFailedAttempts(ip);
+    await resetFailedAttempts(ip);
+
+    // Periodically clean up old rate limit entries
+    cleanupRateLimits().catch(() => {});
 
     await db.user.update({
       where: { id: user.id },

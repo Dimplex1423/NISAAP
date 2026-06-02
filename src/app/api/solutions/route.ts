@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAuth } from '@/lib/auth-middleware';
 import { logAudit } from '@/lib/audit';
-import { createSolutionSchema, formatZodErrors } from '@/lib/validations';
+import { createSolutionSchema, formatZodErrors, safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority');
     const vulnerabilityId = searchParams.get('vulnerabilityId');
     const search = searchParams.get('search');
+    const page = safeParseInt(searchParams.get('page'), 1);
+    const limit = safeParseInt(searchParams.get('limit'), 50, 1, 100);
 
     const where: Record<string, unknown> = {};
     if (implementationStatus) where.implementationStatus = implementationStatus;
@@ -26,15 +28,24 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const solutions = await db.securitySolution.findMany({
-      where,
-      include: {
-        vulnerability: { select: { title: true, severity: true, device: { select: { deviceName: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [solutions, total] = await Promise.all([
+      db.securitySolution.findMany({
+        where,
+        include: {
+          vulnerability: { select: { title: true, severity: true, device: { select: { deviceName: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.securitySolution.count({ where }),
+    ]);
 
-    return NextResponse.json({ success: true, data: solutions });
+    return NextResponse.json({
+      success: true,
+      data: solutions,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
   } catch (error) {
     console.error('Solutions list error:', error);
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
