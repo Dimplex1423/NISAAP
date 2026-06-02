@@ -6,33 +6,17 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient(): PrismaClient {
-  // For Turso: use TURSO_DATABASE_URL for the actual connection
-  // DATABASE_URL must be a valid SQLite URL (like file:./dev.db) for Prisma schema validation
   const tursoUrl = process.env.TURSO_DATABASE_URL || ''
   const tursoToken = process.env.TURSO_AUTH_TOKEN || ''
-
-  console.log('[DB] Environment check:', {
-    tursoUrlSet: tursoUrl.length > 0,
-    tursoUrlPrefix: tursoUrl.substring(0, 30),
-    tursoTokenSet: tursoToken.length > 0,
-    databaseUrl: process.env.DATABASE_URL || 'NOT SET',
-    nodeEnv: process.env.NODE_ENV,
-  })
 
   // If TURSO_DATABASE_URL is set with libsql://, use Turso driver adapter
   if (tursoUrl.startsWith('libsql://') && tursoToken.length > 0) {
     console.log('[DB] Connecting to Turso cloud database:', tursoUrl.substring(0, 40) + '...')
-    try {
-      // PrismaLibSQL is a FACTORY that takes a config object {url, authToken}, NOT a client instance
-      const adapter = new PrismaLibSQL({
-        url: tursoUrl,
-        authToken: tursoToken,
-      })
-      return new PrismaClient({ adapter } as any)
-    } catch (error: any) {
-      console.error('[DB] Failed to create Turso adapter:', error.message)
-      throw error
-    }
+    const adapter = new PrismaLibSQL({
+      url: tursoUrl,
+      authToken: tursoToken,
+    })
+    return new PrismaClient({ adapter } as any)
   }
 
   // Otherwise, use local SQLite (for development)
@@ -42,20 +26,12 @@ function createPrismaClient(): PrismaClient {
   })
 }
 
-// Lazy initialization - only create PrismaClient when first accessed
-let _db: PrismaClient | undefined
+// In production (Vercel serverless), always create a fresh client per cold start.
+// In development, reuse the client to avoid connection pool exhaustion.
+const db = globalForPrisma.prisma ?? createPrismaClient()
 
-export function getDb(): PrismaClient {
-  if (!_db) {
-    _db = globalForPrisma.prisma ?? createPrismaClient()
-    if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = _db
-  }
-  return _db
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = db
 }
 
-// Backward-compatible export using Proxy for lazy access
-export const db = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
-    return (getDb() as any)[prop]
-  },
-})
+export { db }
