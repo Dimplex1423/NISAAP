@@ -51,7 +51,7 @@ export function createSessionCookie(sessionData: SessionData): string {
   const payload = Buffer.from(JSON.stringify(sessionData)).toString('base64');
   const signature = signSessionData(payload);
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  const sameSite = '; SameSite=Strict';
+  const sameSite = '; SameSite=Lax';
   return `${SESSION_COOKIE}=${payload}.${signature}; Path=/; HttpOnly${sameSite}; Max-Age=86400${secure}`;
 }
 
@@ -84,6 +84,6 @@ export function getSessionFromCookie(cookieHeader: string | null): SessionData |
 
 export function getDestroySessionCookie(): string {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  const sameSite = '; SameSite=Strict';
+  const sameSite = '; SameSite=Lax';
   return `${SESSION_COOKIE}=; Path=/; HttpOnly${sameSite}; Max-Age=0${secure}`;
 }
