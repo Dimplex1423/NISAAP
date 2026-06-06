@@ -25,31 +25,8 @@ In conclusion, NISAAP represents a groundbreaking approach to IoT security in Af
     });
   }
 
-  if (fileType === 'audio') {
-    // Read the MP3 file and encode as base64 for serverless compatibility
-    try {
-      const { readFile } = await import('fs/promises');
-      const { join } = await import('path');
-      const audioPath = join(process.cwd(), 'public', 'NISAAP-System-Overview.mp3');
-      const audioBuffer = await readFile(audioPath);
-      return new NextResponse(audioBuffer, {
-        headers: {
-          'Content-Type': 'audio/mpeg',
-          'Content-Disposition': 'attachment; filename="NISAAP-System-Overview.mp3"',
-          'Content-Length': audioBuffer.byteLength.toString(),
-          'Cache-Control': 'public, max-age=3600',
-        },
-      });
-    } catch {
-      return NextResponse.json(
-        { error: 'Audio file not available. Please try the download page.' },
-        { status: 404 }
-      );
-    }
-  }
-
   return NextResponse.json(
-    { error: 'Invalid file type. Use ?file=script or ?file=audio' },
+    { error: 'Invalid file type. Use ?file=script' },
     { status: 400 }
   );
 }
