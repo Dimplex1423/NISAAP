@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  const fileType = request.nextUrl.searchParams.get('file');
+
+  if (fileType === 'script') {
+    const scriptContent = `Welcome to NISAAP, the Network Infrastructure Security Assessment and Action Platform. This is Africa's first purpose-built IoT security platform designed specifically for railway infrastructure, developed for the National Railways of Zimbabwe.
+
+Railway systems today are increasingly reliant on Internet of Things devices. Signal controllers prevent train collisions, GPS trackers monitor locomotive positions, CCTV cameras guard critical facilities, and axle counters detect train presence on tracks. These devices are the digital backbone of modern rail operations. But they also represent a massive attack surface that grows every day. A compromised signal controller could lead to catastrophic collisions. A spoofed GPS tracker could falsify a train's location, putting lives at risk. Default credentials on a CCTV camera could blind an entire station's surveillance. This is exactly the problem NISAAP was built to solve.
+
+So what does NISAAP do? It enables security teams to register and catalogue all IoT devices with full metadata including IP addresses, MAC addresses, firmware versions, and network segments. It tracks vulnerabilities with industry-standard CVSS scoring and CVE references. It manages remediation solutions from proposal all the way through verification. It conducts formal security assessments with documented findings and recommendations. And it maintains an immutable audit trail of every single action taken on the platform. Every feature is contextualized to railway operations, with device types like signal controllers, point machines, axle counters, and network gateways. Vulnerabilities reference real-world threats like unencrypted signal communications with CVSS scores of nine point eight, buffer overflows in track switching equipment, and GPS spoofing attacks on locomotive tracking systems.
+
+Now, what makes NISAAP truly unique compared to existing solutions? First, it is not a generic vulnerability scanner. It is railway-specific from the ground up. Every data model, every classification, every workflow is built around the railway IoT ecosystem. The platform uses custom CVE identifiers tagged with NRZ, creating a bespoke vulnerability catalog that speaks directly to Zimbabwe's rail infrastructure. No other platform offers this level of contextual specificity. Second, NISAAP provides end-to-end remediation tracking. When a vulnerability is discovered, it doesn't just sit in a report gathering dust. A security solution is created and linked directly to that vulnerability, with an assigned owner, a priority level, a cost estimate, and a due date. Solutions move through five clear stages: proposed, approved, in progress, implemented, and verified. This creates complete traceability and accountability from discovery to resolution. Third, the platform features auto-updating risk levels. When new vulnerabilities are found or existing ones are resolved, the affected device's risk level is automatically recalculated. This means the dashboard always reflects the true current security posture in real time. Fourth, NISAAP implements military-grade security to protect the platform itself. Scrypt password hashing resists GPU-based brute force attacks. HMAC-SHA256 signed session cookies with timing-safe comparisons prevent session tampering and side-channel attacks. Database-backed rate limiting blocks IP addresses after five failed login attempts for fifteen minutes, and crucially, this persists across serverless cold starts unlike typical in-memory rate limiters. Seven HTTP security headers are enforced, every input is validated through Zod schemas, and a four-tier role-based access control system ensures users only access what they are authorized to see.
+
+The technology stack is modern and robust. Built with Next.js, React, and TypeScript on the frontend, paired with Prisma ORM and Turso cloud database on the backend, NISAAP runs entirely serverless on Vercel's global content delivery network. This means zero on-premise servers, automatic scaling, and worldwide accessibility from any device. The platform currently manages thirty-one IoT devices across seven stations and six network segments throughout Zimbabwe, tracking twenty-six documented vulnerabilities with CVSS scores ranging up to nine point eight, and managing remediation solutions totaling over three hundred and eighty thousand dollars in estimated costs.
+
+In conclusion, NISAAP represents a groundbreaking approach to IoT security in African railway infrastructure. It transforms reactive security management into a proactive, traceable, and accountable process. From the moment a vulnerability is discovered to the day its solution is verified, every step is documented, every action is audited, and every risk is quantified. This is not just a tool. It is a complete security governance framework, purpose-built for the unique challenges of protecting railway IoT infrastructure. Thank you for listening.`;
+
+    return new NextResponse(scriptContent, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="NISAAP-Audio-Script.txt"',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    });
+  }
+
+  if (fileType === 'audio') {
+    // Read the MP3 file and encode as base64 for serverless compatibility
+    try {
+      const { readFile } = await import('fs/promises');
+      const { join } = await import('path');
+      const audioPath = join(process.cwd(), 'public', 'NISAAP-System-Overview.mp3');
+      const audioBuffer = await readFile(audioPath);
+      return new NextResponse(audioBuffer, {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Content-Disposition': 'attachment; filename="NISAAP-System-Overview.mp3"',
+          'Content-Length': audioBuffer.byteLength.toString(),
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
+    } catch {
+      return NextResponse.json(
+        { error: 'Audio file not available. Please try the download page.' },
+        { status: 404 }
+      );
+    }
+  }
+
+  return NextResponse.json(
+    { error: 'Invalid file type. Use ?file=script or ?file=audio' },
+    { status: 400 }
+  );
+}
